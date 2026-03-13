@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MSM Combination Guide</title>
+  <style>
+    body { font-family:'Courier New', Courier, monospace; background-color: #f5f5f5; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #d98611; text-align: center; }
+    .section { background: white; padding: 20px; margin: 20px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #d98611; color: white; padding: 12px; text-align: left; }
+    td { padding: 12px; border-bottom: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🌱❄️💨💧🪨 MSM Combination Guide 🪨💧💨❄️🌱</h1>
+
+  <div class="section">
+    <input type="text" id="searchInput" placeholder="🔎 Search Monster, Class, or Element" style="width: 100%; padding: 10px;">
+  </div>
+
+  <button onclick="fullReset()" style="background-color: #f39c12; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; font-weight: bold;">
+  ♻️ Reset All
+  </button>
+
+  <div class="section">
+    <h2>👾 Monsters</h2>
+    <div id="monsterList">Loading monsters...</div>
+  </div>
+
+  <div class="section">
+    <h2>🧬 Combinations</h2>
+    <div id="combinationList">Loading combinations...</div>
+  </div>
+
+  <div class="section">
+    <h2>🥚 Add New Monster</h2>
+    <form id="addMonsterForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <input type="text" id="newName" placeholder="Monster Name" required>
+      <input type="text" id="newClass" placeholder="Class (e.g. Natural)" required>
+      <input type="number" step="0.0001" id="newTime" placeholder="Incubation (hr)" required>
+      <button type="submit" style="background-color: #065A82; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px;">Add Monster</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>🧬 Create Combination</h2>
+    <form id="addComboForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+      <select id="p1Select" required><option value="">Select Parent 1</option></select>
+      <span>+</span>
+      <select id="p2Select" required><option value="">Select Parent 2</option></select>
+      <span>=</span>
+      <select id="resSelect" required><option value="">Select Result</option></select>
+      <button type="submit" style="background-color: darkgreen; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px;">Save Combination</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  const API_URL = 'http://localhost:3000/api';
+  let allMonsters = []; 
+  let allCombos = [];
+
+  async function loadData() {
+    try {
+      const [monRes, comboRes] = await Promise.all([
+        fetch(`${API_URL}/monsters`),
+        fetch(`${API_URL}/combinations`)
+      ]);
+      allMonsters = await monRes.json();
+      allCombos = await comboRes.json();
+      
+      displayMonsters(allMonsters);
+      displayCombinations(allCombos);
+      updateDropdowns(allMonsters);
+    } catch (err) {
+      console.error("Load error:", err);
+    }
+  }
+
+  async function fullReset() {
+    if (confirm("This will wipe all current data and restore the full 50+ monster list. Continue?")) {
+      try {
+        const response = await fetch(`${API_URL}/reset-monsters`, { method: 'POST' });
+        if (response.ok) {
+          alert("Restored!");
+          loadData();
+        }
+      } catch (err) {
+        console.error("Reset failed:", err);
+      }
+    }
+  }
+
+  function displayMonsters(monsters) {
+  let html = `
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 40px; text-align: center; cursor: pointer;" onclick="toggleMonsterTable()" title="Click to collapse/expand">
+            <span id="monsterToggleBtn" style="font-size: 1.2em; display: inline-block; transition: transform 0.2s;">▼</span>
+          </th>
+          <th>Monster</th>
+          <th>Class</th>
+          <th>Elements</th>
+          <th>Time (hr)</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="monsterTableBody">
+  `;
+  
+  monsters.forEach(m => {
+    html += `
+      <tr>
+        <td></td>
+        <td>${m.monster_name}</td>
+        <td>${m.class}</td>
+        <td>${m.elements || ""}</td>
+        <td>${m.incubation_time}</td>
+        <td>
+          <button onclick="handleDelete(${m.monster_id}, '${m.monster_name}')" 
+                  style="background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">
+            Delete
+          </button>
+        </td>
+      </tr>`;
+  });
+  
+  html += '</tbody></table>';
+  document.getElementById('monsterList').innerHTML = html;
+}
+
+
+  function toggleMonsterTable() {
+    const tbody = document.getElementById('monsterTableBody');
+    const btn = document.getElementById('monsterToggleBtn');
+    
+    // Check if it's hidden. (Using "" checks the default state before inline styles are applied)
+    if (tbody.style.display === "none") {
+      tbody.style.display = ""; 
+      btn.style.transform = "rotate(0deg)"; // Points down
+    } else {
+      tbody.style.display = "none";
+      btn.style.transform = "rotate(-90deg)"; // Points right
+    }
+  }
+
+  function displayCombinations(combos) {
+    let html = '<table><tr><th>Parent 1</th><th>Parent 2</th><th>Result</th></tr>';
+    combos.forEach(c => {
+      html += `<tr><td>${c.parent_1}</td><td>${c.parent_2}</td><td>${c.result}</td></tr>`;
+    });
+    document.getElementById('combinationList').innerHTML = html + '</table>';
+  }
+
+  function updateDropdowns(monsters) {
+    const selects = [
+      document.getElementById('p1Select'), 
+      document.getElementById('p2Select'), 
+      document.getElementById('resSelect')
+    ];
+    selects.forEach(select => {
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">Select Monster...</option>';
+      monsters.forEach(m => {
+        select.innerHTML += `<option value="${m.monster_id}">${m.monster_name}</option>`;
+      });
+      select.value = currentVal;
+    });
+  }
+
+  async function handleDelete(id, name) {
+    const affected = allCombos.filter(c => c.parent_1 === name || c.parent_2 === name || c.result === name).length;
+    const message = `⚠️ Delete "${name}"?\n\nThis will also remove ${affected} breeding combinations where this monster is involved.\n\nProceed?`;
+    
+    if (confirm(message)) {
+      try {
+        const response = await fetch(`${API_URL}/monsters/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+          loadData();
+        } else {
+          // This will tell you exactly what the database is complaining about!
+          const errorData = await response.json();
+          alert("Delete failed: " + errorData.error); 
+        }
+      } catch (err) {
+        console.error("Delete request failed:", err);
+      }
+    }
+  }
+
+  document.getElementById('addMonsterForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const monsterData = {
+      monster_name: document.getElementById('newName').value,
+      class_name: document.getElementById('newClass').value,
+      incubation_time: document.getElementById('newTime').value
+    };
+    try {
+      const response = await fetch(`${API_URL}/monsters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(monsterData)
+      });
+      if (response.ok) {
+        document.getElementById('addMonsterForm').reset();
+        loadData();
+      }
+    } catch (err) {
+      console.error("Add failed:", err);
+    }
+  });
+
+  document.getElementById('addComboForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const comboData = {
+      parent1_id: document.getElementById('p1Select').value,
+      parent2_id: document.getElementById('p2Select').value,
+      result_id: document.getElementById('resSelect').value
+    };
+    try {
+      const response = await fetch(`${API_URL}/combinations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(comboData)
+      });
+      if (response.ok) {
+        document.getElementById('addComboForm').reset();
+        loadData();
+      }
+    } catch (err) {
+      console.error("Combo save failed:", err);
+    }
+  });
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+  const search = e.target.value.toLowerCase();
+
+  const filteredMonsters = allMonsters.filter(m =>
+    m.monster_name.toLowerCase().includes(search) ||
+    m.class.toLowerCase().includes(search) ||
+    (m.elements && m.elements.toLowerCase().includes(search))
+  );
+
+  displayMonsters(filteredMonsters);
+
+  const filteredCombos = allCombos.filter(c =>
+    c.result.toLowerCase().includes(search) ||
+    c.parent_1.toLowerCase().includes(search) ||
+    c.parent_2.toLowerCase().includes(search)
+  );
+
+  displayCombinations(filteredCombos);
+});
+
+  window.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
