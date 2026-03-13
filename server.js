@@ -17,82 +17,79 @@ const pool = new Pool({
     port: 5433
 });
 
-app.get('/api/combinations', async (req, res) => {
+app.get('/api/combinations', async (req, output) => {
     try {
-        const result = await pool.query(` 
-            SELECT 
-                p1.monster_name AS parent_1, 
-                p2.monster_name AS parent_2, 
+        const result = await pool.query(`
+            SELECT
+                p1.monster_name AS parent_1,
+                p2.monster_name AS parent_2,
                 r.monster_name AS result
             FROM combinations
             JOIN monsters AS p1 ON combinations.parent1_id = p1.monster_id
             JOIN monsters AS p2 ON combinations.parent2_id = p2.monster_id
             JOIN monsters AS r  ON combinations.result_id   = r.monster_id;
         `);
-        res.json(result.rows);
+        output.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        output.status(500).json({ error: err.message });
     }
 });
 
-app.delete('/api/monsters/:id', async (req, res) => {
+app.delete('/api/monsters/:id', async (req, output) => {
     try {
         const monsterId = req.params.id;
-        
-        
+
         await pool.query('DELETE FROM combinations WHERE parent1_id = $1 OR parent2_id = $1 OR result_id = $1', [monsterId]);
-        
-        
+
         await pool.query('DELETE FROM monster_elements WHERE monster_id = $1', [monsterId]);
-        
-      
+
         const result = await pool.query(
             'DELETE FROM monsters WHERE monster_id = $1 RETURNING *',
             [monsterId]
         );
-        
+
         if (result.rows.length === 0) {
-            res.status(404).json({ error: 'Monster not found' });
+            output.status(404).json({ error: 'Monster not found' });
         } else {
-            res.json({ message: 'Monster deleted', monster_name: result.rows[0] });
+            output.json({ message: 'Monster deleted', monster_name: result.rows[0] });
         }
     } catch (err) {
         console.error("Delete Error:", err.message);
-        res.status(500).json({ error: err.message });
+        output.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/monsters', async (req, res) => {
+app.post('/api/monsters', async (req, output) => {
     try {
         const { monster_name, class_name, incubation_time } = req.body;
         if (!monster_name || !class_name) {
-            return res.status(400).json({ error: "Enter name and class." });
+            return output.status(400).json({ error: "Enter name and class." });
         }
 
         const result = await pool.query(
-            'INSERT INTO monsters (monster_name, class, incubation_time) VALUES ($1, $2, $3) RETURNING *', 
+            'INSERT INTO monsters (monster_name, class, incubation_time) VALUES ($1, $2, $3) RETURNING *',
             [monster_name, class_name, incubation_time]
         );
-        res.json(result.rows[0]);
+        output.json(result.rows[0]);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        output.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/combinations', async (req, res) => {
+app.post('/api/combinations', async (req, output) => {
     const { parent1_id, parent2_id, result_id } = req.body;
     try {
         const result = await pool.query(
             'INSERT INTO combinations (parent1_id, parent2_id, result_id) VALUES ($1, $2, $3) RETURNING *',
             [parent1_id, parent2_id, result_id]
         );
-        res.json(result.rows[0]);
+        output.json(result.rows[0]);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        output.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/reset-monsters', async (req, res) => {
+app.post('/api/reset-monsters', async (req, output) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -201,35 +198,35 @@ app.post('/api/reset-monsters', async (req, res) => {
             [monsterId, elementId]
         );
     }
-} 
+}
         await client.query('COMMIT');
-        res.json({ message: "All monsters restored." });
+        output.json({ message: "All monsters restored." });
     } catch (err) {
         await client.query('ROLLBACK');
-        res.status(500).json({ error: err.message });
+        output.status(500).json({ error: err.message });
     } finally {
         client.release();
     }
 });
 
-app.get('/api/monsters', async (req, res) => {
+app.get('/api/monsters', async (req, output) => {
     try {
         const result = await pool.query(`
-            SELECT 
-                m.monster_id,
-                m.monster_name,
-                m.class,
-                m.incubation_time,
+            SELECT
+                maximum.monster_id,
+                maximum.monster_name,
+                maximum.class,
+                maximum.incubation_time,
                 STRING_AGG(e.element_name, ', ') AS elements
-            FROM monsters m
-            LEFT JOIN monster_elements me ON m.monster_id = me.monster_id
+            FROM monsters maximum
+            LEFT JOIN monster_elements me ON maximum.monster_id = me.monster_id
             LEFT JOIN elements e ON me.element_id = e.element_id
-            GROUP BY m.monster_id
-            ORDER BY m.monster_name ASC
+            GROUP BY maximum.monster_id
+            ORDER BY maximum.monster_name ASC
         `);
-        res.json(result.rows);
+        output.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        output.status(500).json({ error: err.message });
     }
 });
 
